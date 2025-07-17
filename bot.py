@@ -1,41 +1,29 @@
-from flask import Flask, request, jsonify
 import os
-import requests
-import hmac
-import hashlib
-import time
+from flask import Flask, request, jsonify
 
 app = Flask(__name__)
 
-API_KEY = os.getenv("API_KEY")
-API_SECRET = os.getenv("API_SECRET")
+@app.route('/')
+def index():
+    return "🚀 Binance ETHUSDT Signal Bot is running!"
 
-BASE_URL = "https://fapi.binance.com"
+@app.route('/webhook', methods=['POST'])
+def webhook():
+    data = request.get_json()
+    print("📥 Webhook received:", data)
 
-def send_order(symbol, side):
-    timestamp = int(time.time() * 1000)
-    params = f"symbol={symbol}&side={side.upper()}&type=MARKET&quantity=100&timestamp={timestamp}"
-    signature = hmac.new(API_SECRET.encode(), params.encode(), hashlib.sha256).hexdigest()
-    url = f"{BASE_URL}/fapi/v1/order?{params}&signature={signature}"
-    headers = {"X-MBX-APIKEY": API_KEY}
-    res = requests.post(url, headers=headers)
-    return res.json()
+    # Εδώ βάλε τη λογική σου για signals (π.χ. έλεγξε αν είναι buy/sell κλπ.)
+    # Παράδειγμα:
+    if data.get("symbol") == "ETHUSDT":
+        signal = data.get("signal")
+        if signal == "buy":
+            print("✅ Buy signal received for ETHUSDT!")
+        elif signal == "sell":
+            print("🔻 Sell signal received for ETHUSDT!")
 
-@app.route("/", methods=["POST"])
-def handle_alert():
-    data = request.json
-    symbol = data.get("symbol")
-    action = data.get("action")
+    return jsonify({"status": "success"}), 200
 
-    if not symbol or not action:
-        return jsonify({"error": "Missing symbol or action"}), 400
-
-    try:
-        response = send_order(symbol, action)
-        return jsonify(response)
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route("/", methods=["GET"])
-def home():
-    return "Binance Signal Bot is running."
+# Αυτό ΚΡΑΤΑ το app ζωντανό (Render requirement)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
