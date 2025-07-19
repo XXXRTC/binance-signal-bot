@@ -1,5 +1,4 @@
 import os
-import time
 from flask import Flask, request, jsonify
 from binance.client import Client
 from binance.exceptions import BinanceAPIException
@@ -14,12 +13,12 @@ api_secret = os.getenv('BINANCE_API_SECRET')
 client = Client(api_key, api_secret)
 client.FUTURES_URL = 'https://fapi.binance.com'
 
-symbol = 'ETHUSDT'
+symbol = 'ETHUSDC'  # Αλλάξαμε σε ETHUSDC perp
 safety_buffer = 0.98  # Χρησιμοποιούμε το 98% του κεφαλαίου για trade
 
 @app.route('/')
 def index():
-    return "🚀 Binance ETHUSDT Futures Signal Bot is running!"
+    return "🚀 Binance ETHUSDC Futures Signal Bot is running!"
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -37,17 +36,20 @@ def webhook():
         return jsonify({"error": "Invalid signal"}), 400
 
     try:
-        # Λήψη διαθέσιμου USDT balance
+        # Λήψη διαθέσιμου USDC balance
         balances = client.futures_account_balance()
-        usdt_balance = next((float(b['balance']) for b in balances if b['asset'] == 'USDT'), 0)
+        usdc_balance = next((float(b['balance']) for b in balances if b['asset'] == 'USDC'), 0)
 
-        if usdt_balance < 10:
+        if usdc_balance < 10:
             return jsonify({"error": "Low balance"}), 400
 
         # Τιμή αγοράς (mark price)
         mark_price_data = client.futures_mark_price(symbol=symbol)
         mark_price = float(mark_price_data['markPrice'])
-        qty = round((usdt_balance * safety_buffer) / mark_price, 3)
+        qty = round((usdc_balance * safety_buffer) / mark_price, 3)
+
+        if qty < 0.001:
+            return jsonify({"error": "Quantity too small"}), 400
 
         # Κλείσιμο υπάρχουσας θέσης αν υπάρχει
         positions = client.futures_position_information(symbol=symbol)
