@@ -13,7 +13,7 @@ client = Client(api_key, api_secret)
 
 # Config
 symbol = 'ETHUSDC'
-safety_buffer = 0.98  # Χρησιμοποιούμε το 98% του κεφαλαίου
+safety_buffer = 1.95  # Χρησιμοποιούμε το 98% του κεφαλαίου
 min_qty = 0.001       # Ελάχιστη ποσότητα που δέχεται η Binance
 
 @app.route('/')
@@ -50,7 +50,7 @@ def webhook():
         print(f"📈 Mark Price: {mark_price}")
 
         # ✅ Υπολογίζουμε ποσότητα
-        qty = round((usdc_balance * safety_buffer * 2) / mark_price, 3)
+        qty = round((usdc_balance * safety_buffer) / mark_price, 2)
         if qty < min_qty:
             return jsonify({"error": f"Quantity too small: {qty}"}), 400
 
