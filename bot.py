@@ -8,11 +8,14 @@ app = Flask(__name__)
 # API Keys από περιβάλλον
 api_key = os.getenv('BINANCE_API_KEY')
 api_secret = os.getenv('BINANCE_API_SECRET')
+
 client = Client(api_key, api_secret)
 
 # Config
 symbol = 'ETHUSDC'
-min_qty = 0.001  # Ελάχιστη ποσότητα
+leverage = 2
+capital_usage = 0.99  # Χρησιμοποιούμε το 99% του κεφαλαίου
+min_qty = 0.001       # Ελάχιστη ποσότητα που δέχεται η Binance
 
 @app.route('/')
 def index():
@@ -42,36 +45,34 @@ def webhook():
         if usdc_balance < 10:
             return jsonify({"error": "Low balance (< $10)"}), 400
 
-        # ✅ Παίρνουμε τρέχον mark price
+        # ✅ Παίρνουμε mark price
         mark_price_data = client.futures_mark_price(symbol=symbol)
         mark_price = float(mark_price_data['markPrice'])
         print(f"📈 Mark Price: {mark_price}")
 
-        # ✅ Παίρνουμε το τρέχον leverage
-        pos_info = client.futures_position_information(symbol=symbol)
-        leverage = int(pos_info[0]['leverage'])
-        print(f"🔧 Current Leverage: x{leverage}")
-
-        # ✅ Υπολογισμός ποσότητας (100% κεφαλαίου * leverage)
-        notional = usdc_balance * leverage
-        qty = round(notional / mark_price, 3)
+        # ✅ Υπολογίζουμε ποσότητα με βάση leverage και χρήση κεφαλαίου
+        position_size_usd = usdc_balance * leverage * capital_usage
+        qty = round(position_size_usd / mark_price, 3)
         if qty < min_qty:
             return jsonify({"error": f"Quantity too small: {qty}"}), 400
-        print(f"🧮 Calculated Quantity: {qty}")
 
-        # ✅ Κλείνουμε προηγούμενη θέση (αν υπάρχει)
-        pos_amt = float(pos_info[0]['positionAmt'])
-        if pos_amt != 0:
-            side = 'SELL' if pos_amt > 0 else 'BUY'
-            close_qty = abs(pos_amt)
-            print(f"⚠️ Closing previous position {side} {close_qty}")
-            close_order = client.futures_create_order(
-                symbol=symbol,
-                side=side,
-                type='MARKET',
-                quantity=close_qty
-            )
-            print(f"❌ Closed existing position: {close_order}")
+        print(f"🧮 Calculated Quantity: {qty} (Leverage x{leverage}, Usage {capital_usage * 100}%)")
+
+        # ✅ Κλείνουμε τυχόν προηγούμενη θέση
+        positions = client.futures_position_information(symbol=symbol)
+        for pos in positions:
+            pos_amt = float(pos['positionAmt'])
+            if pos_amt != 0:
+                side = 'SELL' if pos_amt > 0 else 'BUY'
+                close_qty = abs(pos_amt)
+                print(f"⚠️ Closing previous position {side} {close_qty}")
+                close_order = client.futures_create_order(
+                    symbol=symbol,
+                    side=side,
+                    type='MARKET',
+                    quantity=close_qty
+                )
+                print(f"❌ Closed existing position: {close_order}")
 
         # ✅ Ανοίγουμε νέα θέση
         order_side = 'BUY' if signal == 'buy' else 'SELL'
@@ -86,8 +87,7 @@ def webhook():
         return jsonify({
             "status": "order placed",
             "signal": signal,
-            "qty": qty,
-            "leverage": leverage
+            "qty": qty
         }), 200
 
     except BinanceAPIException as e:
