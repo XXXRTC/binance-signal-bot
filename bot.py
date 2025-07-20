@@ -13,9 +13,8 @@ client = Client(api_key, api_secret)
 
 # Config
 symbol = 'ETHUSDC'
-safety_buffer = 0.98     # Χρησιμοποιούμε το 98% του κεφαλαίου
-leverage_factor = 2      # Υπολογισμός position σαν να έχουμε x2 leverage
-min_qty = 0.001          # Ελάχιστη ποσότητα που δέχεται η Binance
+safety_buffer = 0.98  # Χρησιμοποιούμε το 98% του κεφαλαίου
+min_qty = 0.001       # Ελάχιστη ποσότητα που δέχεται η Binance
 
 @app.route('/')
 def index():
@@ -50,13 +49,12 @@ def webhook():
         mark_price = float(mark_price_data['markPrice'])
         print(f"📈 Mark Price: {mark_price}")
 
-        # ✅ Υπολογίζουμε ποσότητα με leverage x2 και 98% κεφαλαίου
-        usd_to_use = usdc_balance * safety_buffer * leverage_factor
-        qty = round(usd_to_use / mark_price, 3)
+        # ✅ Υπολογίζουμε ποσότητα
+        qty = round((usdc_balance * safety_buffer * 2) / mark_price, 3)
         if qty < min_qty:
             return jsonify({"error": f"Quantity too small: {qty}"}), 400
 
-        print(f"🧮 Final Quantity (x2 leverage, 98% capital): {qty}")
+        print(f"🧮 Calculated Quantity: {qty}")
 
         # ✅ Κλείνουμε τυχόν προηγούμενη θέση
         positions = client.futures_position_information(symbol=symbol)
